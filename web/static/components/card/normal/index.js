@@ -126,9 +126,8 @@ export class NormalCard extends observeState(CustomElement) {
           ${this._render_left_up()}
           ${this._render_right_up()}
         </div>
-        <div ?hidden=${cardState.more_id != this._card_id && this._card_image_error == false}
-             class="card-img-overlay rounded-3 ms-auto"
-             style="background-color: rgba(0, 0, 0, 0.5); box-shadow:0 0 0 1px #dddddd;"
+        <div class="card-img-overlay rounded-3 ms-auto"
+             style="background: linear-gradient(to bottom,  rgba(0,0,0,0) 0%,rgba(0,0,0,0.7) 100%);  box-shadow:0 0 0 1px #dddddd;"
              @click=${() => { navmenu(`media_detail?type=${this.media_type}&id=${this.tmdb_id}`) }}>
           <div style="cursor: pointer">
             ${this.year ? html`<div class="text-white" 
@@ -139,13 +138,6 @@ export class NormalCard extends observeState(CustomElement) {
                   style="margin-bottom: 5px; -webkit-line-clamp:2; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
                 <strong>${this.title}</strong>
               </h2>`
-            : nothing }
-            ${this.overview
-            ? html`
-              <p class="lh-sm text-white"
-                 style="margin-bottom: 5px; -webkit-line-clamp:4; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
-                ${this.overview}
-              </p>`
             : nothing }
             ${this.date
             ? html`

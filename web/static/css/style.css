@@ -158,14 +158,13 @@ body, .page {
     --tblr-aspect-ratio: 150%;
     border: none;
     box-shadow: 0 0 0 1px #888888 inset, 0 .125rem .25rem rgba(0, 0, 0, 0.2);
-    background-image: linear-gradient(45deg, #99999b, #637599 60%);
+    background-image: linear-gradient(45deg, #99999b, #637599 60%) !important;
+    opacity: 1;
 }
 
 .lit-person-card:hover {
     transform: scale(1.05, 1.05);
-    opacity: 1;
     box-shadow: 0 0 0 1px #bbbbbb inset;
-    background-image: linear-gradient(45deg, #bbbbbd, #8597aa 60%);
 }
 
 :root {
@@ -177,12 +176,12 @@ body, .page {
 }
 
 .grid-normal-card {
-    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
     gap: 1.5rem;
 }
 
 .grid-media-card {
-    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
     gap: 1.5rem;
 }
 
@@ -196,7 +195,6 @@ body, .page {
 }
 
 .card:hover {
-    transform: translateY(-0.25rem);
     box-shadow: var(--card-shadow-hover);
 }
 
@@ -333,7 +331,7 @@ body, .page {
 .media-slide-card-number {
     position: relative;
     flex: 0 0 auto;
-    max-width: 11rem;
+    max-width: 18rem;
 }
 
 .background-blur {

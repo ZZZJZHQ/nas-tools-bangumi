@@ -247,7 +247,6 @@ export class PageMediainfo extends CustomElement {
                 card-vote=${item.vote}
                 card-year=${item.year}
                 card-title=${item.title}
-                card-overview=${item.overview}
               ></normal-card>`))
             }
           ></custom-slide>`
@@ -276,7 +275,6 @@ export class PageMediainfo extends CustomElement {
                 card-vote=${item.vote}
                 card-year=${item.year}
                 card-title=${item.title}
-                card-overview=${item.overview}
               ></normal-card>`))
             }
           ></custom-slide>`
