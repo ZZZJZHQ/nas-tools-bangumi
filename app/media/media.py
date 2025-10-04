@@ -11,6 +11,7 @@ from lxml import etree
 from app.helper.tmdb_blacklist_helper import TmdbBlacklistHelper
 import log
 from app.helper.openai_helper import OpenAiHelper
+from app.media.bangumi import Bangumi
 from app.media.meta.metainfo import MetaInfo
 from app.media.tmdbv3api import TMDb, Search, Movie, TV, Person, Find, TMDbException, Discover, Trending, Episode, Genre
 from app.utils import PathUtils, EpisodeFormat, RequestUtils, NumberUtils, StringUtils, cacheman
@@ -2354,3 +2355,113 @@ class Media:
             result.append({"制作公司": production_company})
 
         return result
+    
+    def get_bgmtv_factinfo(self, bangumi_info):
+        """
+        获取BANGUMI TV发布信息
+        """
+        result = []
+        if bangumi_info:
+            # 评分
+            rating = bangumi_info.get("rating", {}).get("score")
+            if rating:
+                result.append({"评分": rating})
+            
+            # 放送日期
+            air_date = bangumi_info.get("date")
+            if air_date:
+                result.append({"放送日期": air_date})
+            
+            # 放送星期
+            air_weekday = bangumi_info.get("air_weekday")
+            if air_weekday:
+                weekdays = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
+                result.append({"放送星期": weekdays.get(air_weekday, air_weekday)})
+            
+            # 排名
+            rank = bangumi_info.get("rank")
+            if rank:
+                result.append({"排名": f"#{rank}"})
+            
+            # 话数
+            eps = bangumi_info.get("eps")
+            if eps:
+                result.append({"话数": f"{eps}话"})
+            
+            # 放送状态
+            is_airing = bangumi_info.get("is_airing")
+            if is_airing is not None:
+                result.append({"状态": "放送中" if is_airing else "已完结"})
+            
+            # 标签
+            tags = bangumi_info.get("tags")
+            if tags:
+                tag_names = [tag.get("name") for tag in tags if tag.get("name")]
+                if tag_names:
+                    result.append({"标签": ", ".join(tag_names)})
+            
+            # 中文名
+            name_cn = bangumi_info.get("name_cn")
+            if name_cn and name_cn != bangumi_info.get("name"):
+                result.append({"中文名": name_cn})
+            
+            # 原名
+            name = bangumi_info.get("name")
+            if name:
+                result.append({"原名": name})
+            
+            # 类型
+            platform = bangumi_info.get("platform")
+            if platform:
+                result.append({"播放平台": platform})
+            
+            # NSFW
+            nsfw = bangumi_info.get("nsfw")
+            if nsfw:
+                result.append({"NSFW": "是"})
+                
+        return result
+    
+
+    def get_bgmtv_cats(self, bangumi_id):
+        """
+        获取BANGUMI TV角色信息
+        :param mtype: 媒体类型
+        :param tmdbid: TMDBID或Bangumi ID
+        """
+        try:
+            characters = Bangumi().characters(subject_id=bangumi_id)
+            if not characters:
+                return []
+            
+            ret_chars = []
+            for character in characters:
+                # 获取角色图片
+                images = character.get("images", {})
+                image_url = images.get("large") or images.get("medium") or images.get("small") or ""
+                
+                # 获取演员信息
+                actors = character.get("actors", [])
+                actor_names = []
+                actor_images = []
+                for actor in actors:
+                    if isinstance(actor, dict):
+                        actor_name = actor.get("name")
+                        if actor_name:
+                            actor_names.append(actor_name)
+                        actor_image = actor.get("images", {}).get("small") if actor.get("images") else ""
+                        if actor_image:
+                            actor_images.append(actor_image)
+                
+                ret_chars.append({
+                    "id": character.get("id"),
+                    "name": character.get("name"),
+                    "role": ('CV:'+character.get("actors")[0].get("name")) or character.get("relation") or "",
+                    "image": image_url,
+                    "actor_name": " / ".join(actor_names) if actor_names else "",
+                    "actor_image": actor_images[0] if actor_images else ""
+                })
+            
+            return ret_chars
+        except Exception as err:
+            log.error(f"【Meta】获取Bangumi角色信息出错：{str(err)}")

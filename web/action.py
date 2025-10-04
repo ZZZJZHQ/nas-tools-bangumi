@@ -4532,64 +4532,101 @@ class WebAction:
         """
         获取媒体详情
         """
-        # TMDBID 或 DB:豆瓣ID
+        # TMDBID 或 DB:豆瓣ID 或 BG:BangumiID
         tmdbid = data.get("tmdbid")
         mtype = MediaType.MOVIE if data.get(
             "type") in MovieTypes else MediaType.TV
         if not tmdbid:
             return {"code": 1, "msg": "未指定媒体ID"}
-        media_info = WebUtils.get_mediainfo_from_id(
-            mtype=mtype, mediaid=tmdbid)
-        # 检查TMDB信息
-        if not media_info or not media_info.tmdb_info:
+        # 处理Bangumi ID
+        if str(tmdbid).startswith("BG:"):
+            bangumi_id = tmdbid[3:]
+            bangumi_info = Bangumi().detail(bid=bangumi_id)
+            if not bangumi_info:
+                return {
+                    "code": 1,
+                    "msg": "无法查询到Bangumi信息"
+                }
+            # Bangumi只显示当前季信息，不显示所有季
+            seasons = []
+            MediaHandler = Media()
             return {
-                "code": 1,
-                "msg": "无法查询到TMDB信息"
+                "code": 0,
+                "data": {
+                    "tmdbid": tmdbid,
+                    "bangumi_id": bangumi_id,
+                    "background": bangumi_info.get("images", {}).get("large", ""),
+                    "image": bangumi_info.get("images", {}).get("large", ""),
+                    "vote": bangumi_info.get("rating", {}).get("score", 0),
+                    "year": bangumi_info.get("date", "")[:4] if bangumi_info.get("date") else "",
+                    "title": bangumi_info.get("name_cn") or bangumi_info.get("name"),
+                    "genres": " | ".join(bangumi_info.get("meta_tags", [])),
+                    "fact": MediaHandler.get_bgmtv_factinfo(bangumi_info),
+                    "overview": bangumi_info.get("summary"),
+                    "actors": MediaHandler.get_bgmtv_cats(bangumi_id=bangumi_id),
+                    "runtime": "",
+                    "link": f"https://bgm.tv/subject/{bangumi_id}",
+                    "douban_link": "",
+                    "fav": "0",  # 需要实现Bangumi收藏状态查询逻辑
+                    "item_url": "",  # 需要实现Bangumi在线观看链接查询逻辑
+                    "seasons": seasons,
+                    "bangumi_info": bangumi_info  # 添加bangumi原始信息
+                }
             }
-        # 查询存在及订阅状态
-        fav, rssid, item_url = self.get_media_exists_info(mtype=mtype,
-                                                          title=media_info.title,
-                                                          year=media_info.year,
-                                                          mediaid=media_info.tmdb_id)
-        MediaHandler = Media()
-        MediaServerHandler = MediaServer()
-        # 查询季
-        seasons = MediaHandler.get_tmdb_tv_seasons(media_info.tmdb_info)
-        # 查询季是否存在
-        if seasons:
-            for season in seasons:
-                season.update({
-                    "state": True if MediaServerHandler.check_item_exists(
-                        mtype=mtype,
-                        title=media_info.title,
-                        year=media_info.year,
-                        tmdbid=media_info.tmdb_id,
-                        season=season.get("season_number")) else False
-                })
-        return {
-            "code": 0,
-            "data": {
-                "tmdbid": media_info.tmdb_id,
-                "douban_id": media_info.douban_id,
-                "background": MediaHandler.get_tmdb_backdrops(tmdbinfo=media_info.tmdb_info),
-                "image": media_info.get_poster_image(),
-                "vote": media_info.vote_average,
-                "year": media_info.year,
-                "title": media_info.title,
-                "genres": MediaHandler.get_tmdb_genres_names(tmdbinfo=media_info.tmdb_info),
-                "overview": media_info.overview,
-                "runtime": StringUtils.str_timehours(media_info.runtime),
-                "fact": MediaHandler.get_tmdb_factinfo(media_info),
-                "crews": MediaHandler.get_tmdb_crews(tmdbinfo=media_info.tmdb_info, nums=6),
-                "actors": MediaHandler.get_tmdb_cats(mtype=mtype, tmdbid=media_info.tmdb_id),
-                "link": media_info.get_detail_url(),
-                "douban_link": media_info.get_douban_detail_url(),
-                "fav": fav,
-                "item_url": item_url,
-                "rssid": rssid,
-                "seasons": seasons
+        else:
+            # 原有TMDB/豆瓣逻辑
+            media_info = WebUtils.get_mediainfo_from_id(
+                mtype=mtype, mediaid=tmdbid)
+            # 检查TMDB信息
+            if not media_info or not media_info.tmdb_info:
+                return {
+                    "code": 1,
+                    "msg": "无法查询到TMDB信息"
+                }
+            # 查询存在及订阅状态
+            fav, rssid, item_url = self.get_media_exists_info(mtype=mtype,
+                                                              title=media_info.title,
+                                                              year=media_info.year,
+                                                              mediaid=media_info.tmdb_id)
+            MediaHandler = Media()
+            MediaServerHandler = MediaServer()
+            # 查询季
+            seasons = MediaHandler.get_tmdb_tv_seasons(media_info.tmdb_info)
+            # 查询季是否存在
+            if seasons:
+                for season in seasons:
+                    season.update({
+                        "state": True if MediaServerHandler.check_item_exists(
+                            mtype=mtype,
+                            title=media_info.title,
+                            year=media_info.year,
+                            tmdbid=media_info.tmdb_id,
+                            season=season.get("season_number")) else False
+                    })
+            return {
+                "code": 0,
+                "data": {
+                    "tmdbid": media_info.tmdb_id,
+                    "douban_id": media_info.douban_id,
+                    "background": MediaHandler.get_tmdb_backdrops(tmdbinfo=media_info.tmdb_info),
+                    "image": media_info.get_poster_image(),
+                    "vote": media_info.vote_average,
+                    "year": media_info.year,
+                    "title": media_info.title,
+                    "genres": MediaHandler.get_tmdb_genres_names(tmdbinfo=media_info.tmdb_info),
+                    "overview": media_info.overview,
+                    "runtime": StringUtils.str_timehours(media_info.runtime),
+                    "fact": MediaHandler.get_tmdb_factinfo(media_info),
+                    "crews": MediaHandler.get_tmdb_crews(tmdbinfo=media_info.tmdb_info, nums=6),
+                    "actors": MediaHandler.get_tmdb_cats(mtype=mtype, tmdbid=media_info.tmdb_id),
+                    "link": media_info.get_detail_url(),
+                    "douban_link": media_info.get_douban_detail_url(),
+                    "fav": fav,
+                    "item_url": item_url,
+                    "rssid": rssid,
+                    "seasons": seasons
+                }
             }
-        }
 
     @staticmethod
     def __media_similar(data):

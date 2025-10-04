@@ -6,8 +6,10 @@ import requests
 from app.media.bangumi_archive import BangumiArchive
 from app.utils import RequestUtils
 from app.utils.types import MediaType
-from config import Config
+from app.utils.redis_store import RedisStore
+import pickle
 import log
+from config import Config
 
 
 class Bangumi(object):
@@ -38,6 +40,9 @@ class Bangumi(object):
         else:
             self.archive = BangumiArchive()
             
+        # 初始化Redis缓存
+        self.redis = RedisStore()
+        
     @classmethod
     def instance(cls):
         if not cls._instance:
@@ -45,6 +50,27 @@ class Bangumi(object):
                 if not cls._instance:
                     cls._instance = cls()
         return cls._instance
+
+    def __get_cache(self, key):
+        """获取缓存"""
+        try:
+            cached = self.redis.get(key)
+            if cached:
+                result = pickle.loads(cached)
+                log.debug(f"【Bangumi】从缓存命中: {key}")
+                return result
+        except Exception as e:
+            log.error(f"【Bangumi】缓存读取失败: {e}")
+        return None
+
+    def __set_cache(self, key, data, ttl=3600):
+        """设置缓存，默认1小时"""
+        try:
+            value = pickle.dumps(data)
+            self.redis.set(key, value, ex=ttl)
+            log.debug(f"【Bangumi】设置缓存: {key}")
+        except Exception as e:
+            log.error(f"【Bangumi】缓存设置失败: {e}")
 
     def __get_headers(self):
         """
@@ -128,15 +154,27 @@ class Bangumi(object):
         优先从本地Archive查询数据，如果不存在则使用在线API
         在网络异常时自动回退到本地Archive（如果启用）
         """
+        # 检查缓存
+        cache_key = f"bangumi:detail:{bid}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 如果启用了Archive，优先从本地获取
         if self.enable_archive and self.archive.exists():
             subject = self.archive.get_subject(int(bid))
             if subject:
+                # 缓存结果
+                self.__set_cache(cache_key, subject)
                 return subject
         
         # 否则从在线API获取
         try:
-            return self.__invoke(self._urls["detail"] % bid)
+            result = self.__invoke(self._urls["detail"] % bid)
+            if result:
+                # 缓存结果
+                self.__set_cache(cache_key, result)
+            return result
         except Exception as e:
             # 网络异常时，如果启用了Archive则尝试从Archive获取
             log.warn(f"【Bangumi】网络请求失败：{e}，尝试从本地Archive获取数据")
@@ -144,9 +182,9 @@ class Bangumi(object):
                 subject = self.archive.get_subject(int(bid))
                 if subject:
                     log.info(f"【Bangumi】从本地Archive成功获取番剧ID {bid} 的信息")
+                    # 缓存结果
+                    self.__set_cache(cache_key, subject)
                     return subject
-                else:
-                    log.warn(f"【Bangumi】本地Archive中未找到番剧ID {bid} 的信息")
             
             # 重新抛出异常
             raise e
@@ -155,25 +193,75 @@ class Bangumi(object):
         """
         获取条目制作人员
         """
+        # 检查缓存
+        cache_key = f"bangumi:persons:{subject_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 如果启用了Archive，优先从本地获取
         if self.enable_archive and self.archive.exists():
             persons = self.archive.get_subject_persons(int(subject_id))
             if persons:
+                # 缓存结果
+                self.__set_cache(cache_key, persons)
                 return persons
                 
-        return self.__invoke(self._urls["credits"] % subject_id)
+        result = self.__invoke(self._urls["credits"] % subject_id)
+        if result:
+            # 缓存结果
+            self.__set_cache(cache_key, result)
+        return result
 
     def characters(self, subject_id):
         """
         获取条目角色列表
         """
+        # 检查缓存
+        cache_key = f"bangumi:characters:{subject_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 如果启用了Archive，优先从本地获取
         if self.enable_archive and self.archive.exists():
             characters = self.archive.get_subject_characters(int(subject_id))
             if characters:
+                # 处理每个角色的简体中文名
+                for character in characters:
+                    character_id = character.get("id")
+                    if character_id:
+                        # 从离线数据库获取详细信息
+                        char_detail = self.archive.get_character(character_id)
+                        if char_detail:
+                            # 使用简体中文名替换角色名
+                            infobox = char_detail.get("infobox", [])
+                            for item in infobox:
+                                if item.get("key") == "简体中文名":
+                                    character["name"] = item.get("value", character.get("name"))
+                                    break
+                # 缓存结果
+                self.__set_cache(cache_key, characters, ttl=1800)  # 30分钟
                 return characters
                 
-        return self.__invoke(self._urls["characters"] % subject_id)
+        result = self.__invoke(self._urls["characters"] % subject_id)
+        if result:
+            # 处理每个角色的简体中文名
+            for character in result:
+                character_id = character.get("id")
+                if character_id:
+                    # 从在线API获取详细信息
+                    char_detail = self.get_bangumi_character_detail(character_id)
+                    if char_detail:
+                        # 使用简体中文名替换角色名
+                        infobox = char_detail.get("infobox", [])
+                        for item in infobox:
+                            if item.get("key") == "简体中文名":
+                                character["name"] = item.get("value", character.get("name"))
+                                break
+            # 缓存结果，角色信息缓存时间可以稍短一些
+            self.__set_cache(cache_key, result, ttl=1800)  # 30分钟
+        return result
 
     @staticmethod
     def __dict_item(item, weekday):
@@ -257,34 +345,72 @@ class Bangumi(object):
         """
         获取人物详情
         """
+        # 检查缓存
+        cache_key = f"bangumi:person_detail:{person_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 如果启用了Archive，优先从本地获取
         if self.enable_archive and self.archive.exists():
             person = self.archive.get_person(int(person_id))
             if person:
+                # 缓存结果
+                self.__set_cache(cache_key, person)
                 return person
                 
         # 否则从在线API获取
-        return self.__invoke(self._urls["person_detail"] % person_id)
+        result = self.__invoke(self._urls["person_detail"] % person_id)
+        if result:
+            # 缓存结果
+            self.__set_cache(cache_key, result)
+        return result
 
     def get_bangumi_character_detail(self, character_id):
         """
         获取角色详情
         """
+        # 检查缓存
+        cache_key = f"bangumi:character_detail:{character_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 如果启用了Archive，优先从本地获取
         if self.enable_archive and self.archive.exists():
             character = self.archive.get_character(int(character_id))
             if character:
+                # 缓存结果
+                self.__set_cache(cache_key, character)
                 return character
                 
         # 否则从在线API获取
-        return self.__invoke(self._urls["character_detail"] % character_id)
+        result = self.__invoke(self._urls["character_detail"] % character_id)
+        if result:
+            # 处理简体中文名
+            infobox = result.get("infobox", [])
+            for item in infobox:
+                if item.get("key") == "简体中文名":
+                    result["name"] = item.get("value", result.get("name"))
+                    break
+            # 缓存结果
+            self.__set_cache(cache_key, result)
+        return result
 
     def get_bangumi_person_credits(self, person_id):
         """
         获取人物参演作品
         """
+        # 检查缓存
+        cache_key = f"bangumi:person_credits:{person_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         ret = self.__invoke(self._urls["person_credits"] % person_id)
         if ret:
+            # 缓存结果
+            self.__set_cache(cache_key, ret)
             return ret
         return []
 
@@ -292,8 +418,16 @@ class Bangumi(object):
         """
         获取角色参演作品
         """
+        # 检查缓存
+        cache_key = f"bangumi:character_credits:{character_id}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         ret = self.__invoke(self._urls["character_credits"] % character_id)
         if ret:
+            # 缓存结果
+            self.__set_cache(cache_key, ret)
             return ret
         return []
 
@@ -303,6 +437,12 @@ class Bangumi(object):
         :param keyword: 搜索关键词
         :param filters: 过滤条件，例如 {"type": [2]} 限制为动画类型
         """
+        # 检查缓存
+        cache_key = f"bangumi:search:{keyword}:{hash(str(filters))}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         # 优先使用v0 API
         if filters is not None:
             params = {
@@ -314,7 +454,10 @@ class Bangumi(object):
                 
             ret = self.__post(self._urls["search"], **params)
             if ret:
-                return ret.get("data") or []
+                result = ret.get("data") or []
+                # 缓存结果，搜索结果缓存时间可以短一些
+                self.__set_cache(cache_key, result, ttl=600)  # 10分钟
+                return result
         return []
 
     def get_bangumi_episodes(self, bid, episode_type=None, limit=100, offset=0):
@@ -325,6 +468,12 @@ class Bangumi(object):
         :param limit: 返回数据量限制
         :param offset: 偏移量
         """
+        # 检查缓存
+        cache_key = f"bangumi:episodes:{bid}:{episode_type}:{limit}:{offset}"
+        cached_result = self.__get_cache(cache_key)
+        if cached_result:
+            return cached_result
+            
         params = {
             "subject_id": bid,
             "limit": limit,
@@ -336,6 +485,8 @@ class Bangumi(object):
             
         ret = self.__invoke(self._urls["episodes"], **params)
         if ret:
+            # 缓存结果
+            self.__set_cache(cache_key, ret)
             return ret
         return {}
 

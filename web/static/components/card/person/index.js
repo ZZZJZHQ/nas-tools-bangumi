@@ -4,6 +4,7 @@ import { CustomElement, Golbal } from "../../utility/utility.js";
 export class PersonCard extends CustomElement {
 
   static properties = {
+    is_bangumi: {attribute: "is-bangumi"},
     person_id: { attribute: "person-id" },
     person_image: { attribute: "person-image" },
     person_name: { attribute: "person-name" },
@@ -14,21 +15,29 @@ export class PersonCard extends CustomElement {
   constructor() {
     super();
     this.lazy = "0";
+    this.is_bangumi = "0";
   }
 
   render() {
     return html`
       <div class="card card-sm lit-person-card rounded-3 overflow-hidden cursor-pointer ratio">
         <div class="text-center p-4 pt-3 placeholder-glow">
-          <div class="avatar-rounded overflow-hidden" style="position:relative;z-index:1;">
-            <custom-img
-              lazy=${this.lazy}
-              img-src=${this.person_image}
-              img-noimage=${Golbal.noImage_person}
-              img-ratio="100%"
-              img-style="object-fit:cover;"
-            ></custom-img>
-          </div>
+          ${this.is_bangumi === "1" 
+            ? html`
+              <div class="overflow-hidden" style="position:relative;z-index:1;width:100%;height:80%;border-radius: 10px;;background-image:url(${this.person_image});background-size:cover;background-position:top;"></div>
+              `
+            : html`
+              <div class="avatar-rounded overflow-hidden" style="position:relative;z-index:1;">
+                <custom-img
+                  lazy=${this.lazy}
+                  img-src=${this.person_image}
+                  img-noimage=${Golbal.noImage_person}
+                  img-ratio="100%"
+                  img-style="object-fit:cover;"
+                ></custom-img>
+              </div>
+              `
+          }
           <h3 class="lh-sm text-white mt-3 ${this.lazy == "1" ? "placeholder" : ""}"
               style="margin-bottom: 5px; -webkit-line-clamp:2; display: -webkit-box; -webkit-box-orient:vertical; overflow:hidden; text-overflow: ellipsis;">
             <strong>${this.person_name}</strong>

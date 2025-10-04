@@ -5,8 +5,8 @@ export class PageMediainfo extends CustomElement {
   static properties = {
     // 类型
     media_type: { attribute: "media-type" },
-    // TMDBID/DB:豆瓣ID
-    tmdbid: { attribute: "media-tmdbid" },
+    // 媒体ID（TMDBID/DB:豆瓣ID/BG:BangumiID）
+    media_id: { attribute: "media-tmdbid" },
     // 是否订阅/下载
     fav: {},
     // 媒体信息
@@ -31,11 +31,11 @@ export class PageMediainfo extends CustomElement {
 
   firstUpdated() {
     // 媒体信息、演员阵容
-    Golbal.get_cache_or_ajax("media_detail", "info", { "type": this.media_type, "tmdbid": this.tmdbid},
+    Golbal.get_cache_or_ajax("media_detail", "info", { "type": this.media_type, "tmdbid": this.media_id},
       (ret) => {
         if (ret.code === 0) {
           this.media_info = ret.data;
-          this.tmdbid = ret.data.tmdbid;
+          this.media_id = ret.data.tmdbid;
           this.fav = ret.data.fav;
           this.item_url = ret.data.item_url
           this.seasons_data = ret.data.seasons;
@@ -56,7 +56,7 @@ export class PageMediainfo extends CustomElement {
             }
           );
         } else {
-          show_fail_modal("未查询到TMDB媒体信息！");
+          show_fail_modal("未查询到媒体信息！");
           window.history.go(-1);
         }
       }
@@ -69,6 +69,11 @@ export class PageMediainfo extends CustomElement {
         style="min-width:${width};min-height:${height};">
       </div>
     `);
+  }
+
+  // 判断是否为Bangumi ID
+  _isBangumi() {
+    return String(this.media_id).startsWith("BG:");
   }
 
   render() {
@@ -101,11 +106,11 @@ export class PageMediainfo extends CustomElement {
                     <strong class="h1" ?hidden=${!this.media_info.year}>(${this.media_info.year})</strong>
                   </h1>
                   <div class="align-self-center align-self-md-start text-center">
-                    <span class="h3 ms-1" ?hidden=${!this.media_info.runtime}>${this.media_info.runtime}</span>
+                    <span class="h3 ms-1" ?hidden=${!this.media_info.runtime || this._isBangumi()}>${this.media_info.runtime}</span>
                     <span class="h3" ?hidden=${!this.media_info.genres}>| ${this.media_info.genres}</span>
-                    <span class="h3" ?hidden=${!this.seasons_data.length}>| 共 ${this.seasons_data.length} 季</span>
-                    <span class="h3" ?hidden=${!this.media_info.link}>| TMDB: <a href="${this.media_info.link}" target="_blank">${this.media_info.tmdbid}</a></span>
-                    <span class="h3" ?hidden=${!this.media_info.douban_link}>| 豆瓣: <a href="${this.media_info.douban_link}" target="_blank">${this.media_info.douban_id}</a>
+                    <span class="h3" ?hidden=${!this.seasons_data.length || this._isBangumi()}>| 共 ${this.seasons_data.length} 季</span>
+                    <span class="h3" ?hidden=${!this.media_info.link && !this._isBangumi()}>| ${this._isBangumi() ? 'Bangumi' : 'TMDB'}: <a href="${this.media_info.link}" target="_blank">${this.media_id}</a></span>
+                    <span class="h3" ?hidden=${!this.media_info.douban_link || this._isBangumi()}>| 豆瓣: <a href="${this.media_info.douban_link}" target="_blank">${this.media_info.douban_id}</a>
                     ${Object.keys(this.media_info).length === 0 ? this._render_placeholder("205px") : nothing }
                   </div>
                   <div class="align-self-center align-self-md-start text-center mt-1">
@@ -114,25 +119,27 @@ export class PageMediainfo extends CustomElement {
                       <span class="btn btn-primary btn-pill mt-1"
                         @click=${(e) => {
                           e.stopPropagation();
-                          media_search(this.tmdbid + "", this.media_info.title, this.media_type);
+                          media_search(this.media_id + "", this.media_info.title, this.media_type);
                         }}>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><circle cx="10" cy="10" r="7"></circle><line x1="21" y1="21" x2="15" y2="15"></line></svg>
                         搜索资源
                       </span>
-                      ${this.fav == "1"
+                      ${this.fav == "1" && !this._isBangumi()
                       ? html`
                         <span class="btn btn-pill btn-pinterest mt-1"
                           @click=${this._loveClick}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="7" x2="20" y2="7" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" /><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" /></svg>
                           删除订阅
                         </span>`
-                      : html`
+                      : nothing}
+                      ${this.fav != "1" && !this._isBangumi()
+                      ? html`
                         <span class="btn btn-pill btn-purple mt-1"
                           @click=${this._loveClick}>
                           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
                           添加订阅
                         </span>`
-                      }
+                      : nothing}
                       ${this.item_url ? html`
                       <span class="btn btn-pill btn-green mt-1" @click=${this._openItemUrl}>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-device-tv-old" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M3 7m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z"></path><path d="M16 3l-4 4l-4 -4"></path><path d="M15 7v13"></path><path d="M18 15v.01"></path><path d="M18 12v.01"></path></svg>
@@ -159,7 +166,7 @@ export class PageMediainfo extends CustomElement {
               <small>${this.media_info.overview ?? this._render_placeholder("200px", "", "col-12", 7)}</small>
             </h2>
             <div class="row mx-2 mt-4 d-none d-md-flex">
-              ${this.media_info.crews
+              ${this.media_info.crews && !this._isBangumi()
               ? this.media_info.crews.map((item, index) => ( html`
                 <div class="col-12 col-md-6 col-lg-4">
                   <h2 class="">
@@ -172,15 +179,16 @@ export class PageMediainfo extends CustomElement {
                 `) )
               : nothing }
             </div>
+            ${!this._isBangumi() ? html`
             <accordion-seasons
               .seasons_data=${this.seasons_data}
-              .tmdbid=${this.tmdbid}
+              .tmdbid=${this.media_id}
               .title=${this.media_info.title}
               .year=${this.media_info.year}
-            ></accordion-seasons>
+            ></accordion-seasons>` : nothing}
           </div>
           <div class="col-lg-3">
-            ${this.media_info.fact
+            ${this.media_info.fact && !this._isBangumi()
             ? html`
               <div class="ms-2 me-2 mt-1">
                 <div class="card rounded-3" style="background: none">
@@ -203,11 +211,11 @@ export class PageMediainfo extends CustomElement {
         </div>
 
         <!-- 渲染演员阵容 -->
-        ${this.media_info.actors && this.media_info.actors.length
+        ${this.media_info.actors && this.media_info.actors.length && !this._isBangumi()
         ? html`
           <custom-slide
             slide-title="演员阵容"
-            slide-click='javascript:navmenu("discovery_person?tmdbid=${this.tmdbid}&type=${this.media_type}&title=演员&subtitle=${this.media_info.title}")'
+            slide-click='javascript:navmenu("discovery_person?tmdbid=${this.media_id}&type=${this.media_type}&title=演员&subtitle=${this.media_info.title}")'
             lazy="person-card"
             .slide_card=${this.media_info.actors.map((item) => ( html`
               <person-card
@@ -225,11 +233,11 @@ export class PageMediainfo extends CustomElement {
         : nothing }
 
         <!-- 渲染类似影片 -->
-        ${this.similar_media.length
+        ${this.similar_media.length && !this._isBangumi()
         ? html`
           <custom-slide
             slide-title="类似"
-            slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=sim&tmdbid=${this.tmdbid}&title=类似&subtitle=${this.media_info.title}")'
+            slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=sim&tmdbid=${this.media_id}&title=类似&subtitle=${this.media_info.title}")'
             lazy="normal-card"
             .slide_card=${this.similar_media.map((item, index) => ( html`
               <normal-card
@@ -253,11 +261,11 @@ export class PageMediainfo extends CustomElement {
         : nothing }
 
         <!-- 渲染推荐影片 -->
-        ${this.recommend_media.length
+        ${this.recommend_media.length && !this._isBangumi()
         ? html`
           <custom-slide
             slide-title="推荐"
-            slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=more&tmdbid=${this.tmdbid}&title=推荐&subtitle=${this.media_info.title}")'
+            slide-click='javascript:navmenu("recommend?type=${this.media_type}&subtype=more&tmdbid=${this.media_id}&title=推荐&subtitle=${this.media_info.title}")'
             lazy="normal-card"
             .slide_card=${this.recommend_media.map((item, index) => ( html`
               <normal-card
@@ -292,7 +300,7 @@ export class PageMediainfo extends CustomElement {
 
   _loveClick(e) {
     e.stopPropagation();
-    Golbal.lit_love_click(this.media_info.title, this.media_info.year, this.media_type, this.tmdbid, this.fav,
+    Golbal.lit_love_click(this.media_info.title, this.media_info.year, this.media_type, this.media_id, this.fav,
       () => {
         this.fav = "0";
         this._update_fav_data();
@@ -306,6 +314,5 @@ export class PageMediainfo extends CustomElement {
     window.open(this.item_url, '_blank');
   }
 }
-
 
 window.customElements.define("page-mediainfo", PageMediainfo);
