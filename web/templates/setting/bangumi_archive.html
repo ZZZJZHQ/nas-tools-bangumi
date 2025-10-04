@@ -1,0 +1,242 @@
+{% import 'macro/svg.html' as SVG %}
+{% import 'macro/form.html' as FORM %}
+{% import 'macro/oops.html' as OOPS %}
+<div class="container-xl">
+  <!-- Page title -->
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">
+          Bangumi离线数据库
+        </h2>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 业务页面代码 -->
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">基础设置</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-lg-6">
+            <div class="mb-3">
+              <label class="form-label">更新周期</label>
+              <select class="form-select" id="bangumi_archive_cron">
+                <option value="0 4 * * *" {% if Config.cron == "0 4 * * *" %}selected{% endif %}>每天凌晨4点</option>
+                <option value="0 3 * * 1" {% if Config.cron == "0 3 * * 1" %}selected{% endif %}>每周一凌晨3点</option>
+                <option value="0 2 1 * *" {% if Config.cron == "0 2 1 * *" %}selected{% endif %}>每月1日2点</option>
+                <option value="0 5 */3 * *" {% if Config.cron == "0 5 */3 * *" %}selected{% endif %}>每3天5点</option>
+                <option value="" {% if not Config.cron %}selected{% endif %}>不自动更新</option>
+              </select>
+              <div class="form-hint">
+                设置自动更新数据的时间周期
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <div class="mb-3">
+              <label class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bangumi_archive_enabled" {% if Config.enabled %}checked{% endif %}>
+                <span class="form-check-label">启用Bangumi Archive</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-lg-6">
+            <div class="mb-3">
+              <label class="form-label">Bangumi Access Token</label>
+              <input type="password" value="{{ Config.access_token or '' }}" id="bangumi_access_token" class="form-control" placeholder="请输入Bangumi Access Token">
+              <div class="form-hint">
+                用于访问Bangumi API的认证令牌，可提高API调用限制
+                <a href="https://next.bgm.tv/demo/access-token/create" target="_blank">获取Access Token</a>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="mb-3">
+              <label class="form-label">Token状态</label>
+              <div class="form-control-plaintext" id="bangumi_token_status">
+                {% if Config.access_token %}已配置{% else %}未配置{% endif %}
+              </div>
+              <button class="btn btn-sm btn-primary mt-1" type="button" onclick="test_bangumi_token()">测试Token</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="row align-items-center">
+          <div class="col-auto">
+            <a href="javascript:save_bangumi_archive_config()" class="btn btn-primary">保存</a>
+          </div>
+          <div class="col-auto">
+            <a href="javascript:update_bangumi_archive()" class="btn btn-success">手动更新</a>
+          </div>
+          <div class="col-auto">
+            <a href="javascript:clear_bangumi_archive()" class="btn btn-danger">清空数据</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 进度条 -->
+    <div class="card mt-3" id="progress_card" style="display: none;">
+      <div class="card-header">
+        <h3 class="card-title">更新进度</h3>
+      </div>
+      <div class="card-body">
+        <div class="progress">
+          <div class="progress-bar" id="update_progress" style="width: 0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="mt-2">
+          <span id="progress_text">准备更新...</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">状态信息</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">数据大小</label>
+              <div class="form-control-plaintext" id="archive_status_size">-</div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">更新时间</label>
+              <div class="form-control-plaintext" id="archive_status_time">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card mt-3">
+      <div class="card-header">
+        <h3 class="card-title">更新日志</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-12">
+            <div class="card-body p-0">
+              <div id="archive_log_list" class="table-responsive">
+                <table class="table table-vcenter card-table table-hover table-striped">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>状态</th>
+                      <th>详情</th>
+                    </tr>
+                  </thead>
+                  <tbody id="archive_log_content">
+                    <tr>
+                      <td colspan="3" class="text-center">暂无日志</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+  // 页面加载完成后获取状态
+  $(document).ready(function () {
+    load_bangumi_archive_status();
+  });
+  
+  // 测试Bangumi Token功能
+  function test_bangumi_token() {
+    let token = $("#bangumi_access_token").val();
+    if (!token) {
+      show_fail_modal("请输入Access Token");
+      return;
+    }
+    
+    show_wait_modal("正在验证Token...");
+    ajax_post("test_bangumi_token", {"token": token}, function (ret) {
+      hide_wait_modal();
+      if (ret.code === 0) {
+        show_success_modal(`验证成功！用户: ${ret.data.nickname} (${ret.data.username})`);
+        // 更新Token状态显示
+        $("#bangumi_token_status").text("已配置");
+      } else {
+        show_fail_modal(ret.msg);
+      }
+    });
+  }
+  
+  // 更新Bangumi Archive数据
+  function update_bangumi_archive() {
+    // 显示进度条
+    $("#progress_card").show();
+    $("#update_progress").css("width", "0%").text("0%").attr("aria-valuenow", 0);
+    $("#progress_text").text("开始更新...");
+    
+    // 启动更新任务
+    let current_task_id = null;
+    ajax_post("update_bangumi_archive", {}, function (ret) {
+      if (ret.code === 0) {
+        // 保存任务ID
+        current_task_id = ret.task_id;
+        // 启动进度轮询
+        poll_progress(current_task_id);
+      } else {
+        show_fail_modal("启动更新失败: " + ret.msg);
+        $("#progress_card").hide();
+      }
+    });
+  }
+  
+  // 轮询进度
+  function poll_progress(task_id) {
+    let poll_interval = setInterval(function() {
+      ajax_post("get_bangumi_archive_progress", {"task_id": task_id}, function(ret) {
+        if (ret.code === 0) {
+          let progress = ret.progress;
+          if (progress >= 0 && progress <= 100) {
+            $("#update_progress").css("width", progress + "%").text(progress + "%").attr("aria-valuenow", progress);
+            $("#progress_text").text("更新中... (" + progress + "%)");
+          }
+          
+          // 如果进度为100或-1，表示完成或失败
+          if (progress === 100) {
+            clearInterval(poll_interval);
+            $("#progress_text").text("更新完成");
+            setTimeout(function() {
+              $("#progress_card").hide();
+              load_bangumi_archive_status(); // 刷新状态和日志
+              show_success_modal("Bangumi Archive更新完成");
+            }, 1000);
+          } else if (progress === -1) {
+            clearInterval(poll_interval);
+            $("#progress_text").text("更新失败");
+            setTimeout(function() {
+              $("#progress_card").hide();
+              load_bangumi_archive_status(); // 刷新状态和日志
+              show_fail_modal("Bangumi Archive更新失败");
+            }, 1000);
+          }
+        } else {
+          clearInterval(poll_interval);
+          $("#progress_card").hide();
+          show_fail_modal("获取进度失败: " + ret.msg);
+        }
+      }, true, false);
+    }, 1000); // 每秒查询一次进度
+  }
+</script>

@@ -25,6 +25,7 @@ from icalendar import Calendar, Event, Alarm
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_session import Session
 
+from app.helper.bangumi_archive_helper import BangumiArchiveHelper
 from app.helper.drissionpage_helper import DrissionPageHelper
 from app.helper.tmdb_blacklist_helper import TmdbBlacklistHelper
 import log
@@ -1072,6 +1073,16 @@ def user_rss():
                            RestypeDict=RestypeDict,
                            PixDict=PixDict,
                            DownloadSettings=DownloadSettings)
+
+
+# Bangumi Archive设置页面
+@App.route('/bangumi_archive', methods=['POST', 'GET'])
+@login_required
+def bangumi_archive():
+    archive_helper = BangumiArchiveHelper()
+    config = archive_helper.get_config()
+    return render_template("setting/bangumi_archive.html",
+                           Config=config)
 
 
 # RSS解析器页面

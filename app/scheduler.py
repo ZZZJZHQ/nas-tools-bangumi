@@ -27,6 +27,8 @@ from web.backend.wallpaper import get_login_wallpaper
 
 from app.scheduler_service import SchedulerService
 from app.queue import scheduler_queue
+from app.helper.bangumi_archive_helper import BangumiArchiveHelper
+from app.media.bangumi_archive_updater import BangumiArchiveUpdater
 
 
 class Scheduler(metaclass=SingletonMeta):
@@ -34,6 +36,7 @@ class Scheduler(metaclass=SingletonMeta):
     _pt = None
     _douban = None
     _media = None
+    _bangumi = None
     _jobstore = 'default'
     _lock = Lock()
 
@@ -44,6 +47,7 @@ class Scheduler(metaclass=SingletonMeta):
     def init_config(self):
         self._pt = Config().get_config('pt')
         self._media = Config().get_config('media')
+        self._bangumi = Config().get_config('bangumi')
         self.scheduler = SchedulerService()
         self.scheduler.start_service()
         self.run_service()
@@ -144,6 +148,26 @@ class Scheduler(metaclass=SingletonMeta):
                         "jobstore": self._jobstore
                     })
                     log.info("媒体库同步服务启动")
+
+        # Bangumi Archive自动更新任务
+        if self._bangumi:
+            enable_archive = self._bangumi.get("enable_archive")
+            update_interval = self._bangumi.get("update_interval")
+            if enable_archive and update_interval:
+                try:
+                    update_interval = int(update_interval)
+                except (ValueError, TypeError):
+                    update_interval = 7  # 默认每周更新一次
+                    
+                scheduler_queue.put({
+                    "func_str": "Scheduler.run_archive_update_task",
+                    "args": [],
+                    "job_id": "Scheduler.run_archive_update_task",
+                    "trigger": "interval",
+                    "days": update_interval,
+                    "jobstore": self._jobstore
+                })
+                log.info(f"Bangumi Archive自动更新服务启动，更新周期：{update_interval}天")
 
         # 定时把队列中的监控文件转移走
         scheduler_queue.put({
@@ -254,3 +278,33 @@ class Scheduler(metaclass=SingletonMeta):
 
     def stop_service(self):
         self.scheduler.stop_service()
+
+    @staticmethod
+    def run_archive_update_task():
+        """
+        运行Bangumi Archive更新任务
+        """
+        _archive_helper = BangumiArchiveHelper()
+        # 检查是否启用Archive功能
+        enable_archive = _archive_helper.get_config().get("enabled")
+        if not enable_archive:
+            log.info("【BangumiArchive】Bangumi Archive更新任务未启用，跳过更新")
+            return
+
+        try:
+            log.info("【BangumiArchive】开始更新Bangumi Archive数据...")
+            
+            # 执行更新
+            updater = BangumiArchiveUpdater()
+            result = updater.update_archive()
+            
+            if result:
+                log.info("【BangumiArchive】Bangumi Archive数据更新成功")
+                # 更新最后更新时间
+                # 这里需要实现更新时间的逻辑
+            else:
+                log.error("【BangumiArchive】Bangumi Archive数据更新失败")
+                
+        except Exception as e:
+            log.error("【BangumiArchive】Bangumi Archive数据更新出错：%s", str(e))
+            raise e

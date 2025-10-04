@@ -15,3 +15,4 @@ from .plugin_helper import PluginHelper
 from .drissionpage_helper import DrissionPageHelper
 from .cookiecloud_helper import CookiecloudHelper
 from .tmdb_blacklist_helper import TmdbBlacklistHelper
+from .bangumi_archive_helper import BangumiArchiveHelper

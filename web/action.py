@@ -22,6 +22,7 @@ from werkzeug.security import generate_password_hash
 from app.helper import tmdb_blacklist_helper
 from app.helper.drissionpage_helper import DrissionPageHelper
 from app.helper.tmdb_blacklist_helper import TmdbBlacklistHelper
+from app.helper.bangumi_archive_helper import BangumiArchiveHelper
 import log
 from app.brushtask import BrushTask
 from app.conf import SystemConfig, ModuleConf
@@ -234,6 +235,13 @@ class WebAction:
             "update_category_config": self.update_category_config,
             "get_category_config": self.get_category_config,
             "get_system_processes": self.get_system_processes,
+            "get_bangumi_archive_status": self.get_bangumi_archive_status,
+            "update_bangumi_archive": self.update_bangumi_archive,
+            "clear_bangumi_archive": self.clear_bangumi_archive,
+            "get_bangumi_archive_progress": self.get_bangumi_archive_progress,
+            "get_bangumi_archive_logs": self.get_bangumi_archive_logs,
+            "test_bangumi_token": self.test_bangumi_token,
+            "save_bangumi_archive_config": self.save_bangumi_archive_config,
             "run_plugin_method": self.run_plugin_method,
             "update_all_config": self.__update_all_config,
             "add_tmdb_blacklist": self.__add_tmdb_blacklist,
@@ -5205,3 +5213,205 @@ class WebAction:
         # 删除该识别记录对应的转移记录
         _filetransfer.truncate_transfer_blacklist()
         return {"retcode": 0}
+    
+    @staticmethod
+    def get_bangumi_archive_status():
+        """
+        获取Bangumi离线数据库状态
+        """
+        try:
+            from app.helper.bangumi_archive_helper import BangumiArchiveHelper
+            from app.media.bangumi_archive_updater import BangumiArchiveUpdater
+            import os
+                
+            # 获取配置
+            archive_helper = BangumiArchiveHelper()
+            config = archive_helper.get_config()
+                
+            # 获取数据路径
+            archive_path = config.get("archive_path", "")
+            if not archive_path:
+                archive_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bangumi_archive")
+                
+            # 计算数据大小
+            data_size = "0 MB"
+            if os.path.exists(archive_path):
+                total_size = 0
+                for dirpath, _dirnames, filenames in os.walk(archive_path):
+                    for f in filenames:
+                        fp = os.path.join(dirpath, f)
+                        if os.path.exists(fp):
+                            total_size += os.path.getsize(fp)
+                    
+                # 转换为可读格式
+                if total_size > 0:
+                    units = ['B', 'KB', 'MB', 'GB', 'TB']
+                    unit_index = 0
+                    size = float(total_size)
+                    while size >= 1024 and unit_index < len(units) - 1:
+                        size /= 1024
+                        unit_index += 1
+                    data_size = f"{size:.2f} {units[unit_index]}"
+                
+            # 获取更新时间
+            last_update_time = config.get("last_update_time", "")
+                
+            return {
+                "code": 0, 
+                "data": {
+                    "archive_path": archive_path,
+                    "data_size": data_size,
+                    "last_update_time": last_update_time,
+                    "enable_archive": config.get("enable_archive", False),
+                    "update_interval": config.get("update_interval", 7)
+                }
+            }
+        except Exception as e:
+            return {"code": 1, "msg": f"获取状态失败：{str(e)}"}
+        
+    def get_bangumi_archive_status(self):
+        """
+        获取Bangumi Archive状态
+        """
+        try:
+            from app.helper.bangumi_archive_helper import BangumiArchiveHelper
+            archive_helper = BangumiArchiveHelper()
+            status = archive_helper.get_status()
+            return {"code": 0, "status": status}
+        except Exception as e:
+            return {"code": 1, "msg": f"获取状态失败：{str(e)}"}
+        
+    def get_bangumi_archive_logs(self, data=None):
+        """
+        获取Bangumi Archive更新日志
+        """
+        archive_helper = BangumiArchiveHelper()
+        logs = archive_helper.get_logs()
+        return {"code": 0, "logs": logs}
+        
+    def get_bangumi_archive_progress(self, data=None):
+        """
+        获取Bangumi Archive更新进度
+        """
+        task_id = data.get("task_id") if data else "default"
+        archive_helper = BangumiArchiveHelper()
+        progress = archive_helper.get_progress(task_id)
+        return {"code": 0, "progress": progress}
+        
+    def update_bangumi_archive(self, data=None):
+        """
+        手动更新Bangumi Archive
+        """
+        import uuid
+        task_id = str(uuid.uuid4())
+        
+        # 启动异步更新任务
+        from threading import Thread
+        from app.helper.bangumi_archive_helper import BangumiArchiveHelper
+        
+        def update_task():
+            try:
+                archive_helper = BangumiArchiveHelper()
+                result = archive_helper.update_archive(task_id)
+                # 更新完成后清除缓存状态
+                archive_helper._cached_status = None
+            except Exception as e:
+                print(f"更新Bangumi Archive时出错: {e}")
+        
+        thread = Thread(target=update_task)
+        thread.daemon = True
+        thread.start()
+        
+        # 立即返回task_id
+        return {"code": 0, "msg": "开始更新Bangumi Archive", "task_id": task_id}
+            
+    def clear_bangumi_archive(self, data=None):
+        """
+        清空Bangumi Archive数据
+        """
+        archive_helper = BangumiArchiveHelper()
+        result = archive_helper.clear_data()
+        if result:
+            return {"code": 0, "msg": "Bangumi Archive数据已清空"}
+        else:
+            return {"code": 1, "msg": "Bangumi Archive数据清空失败"}
+            
+    @staticmethod
+    def test_bangumi_token(data):
+        """
+        测试Bangumi Token
+        """
+        token = data.get("token")
+        if not token:
+            return {"code": 1, "msg": "Token不能为空"}
+
+        import requests
+        from config import Config
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "User-Agent": Config().get_ua(),
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            resp = requests.get(
+                "https://api.bgm.tv/v0/me",
+                headers=headers,
+                timeout=10
+            )
+            
+            if resp.status_code == 200:
+                user_info = resp.json()
+                return {
+                    "code": 0, 
+                    "msg": "验证成功",
+                    "data": {
+                        "username": user_info.get("username"),
+                        "nickname": user_info.get("nickname")
+                    }
+                }
+            elif resp.status_code == 401:
+                return {"code": 1, "msg": "Token无效或已过期"}
+            else:
+                return {"code": 1, "msg": f"请求失败，状态码：{resp.status_code}"}
+                
+        except Exception as e:
+            return {"code": 1, "msg": f"请求异常：{str(e)}"}
+
+    def save_bangumi_archive_config(self, data=None):
+        """
+        保存Bangumi Archive配置
+        """
+        try:
+            from app.helper.bangumi_archive_helper import BangumiArchiveHelper
+                
+            # 获取配置参数
+            enabled = data.get("enabled")
+            cron = data.get("cron")
+            access_token = data.get("access_token")
+                
+            # 更新配置
+            archive_helper = BangumiArchiveHelper()
+                
+            # 转换enabled为布尔值
+            if isinstance(enabled, str):
+                enabled = enabled.lower() == "true"
+                
+            # 保存配置
+            config_data = {
+                "enabled": enabled,
+                "cron": cron,
+                "access_token": access_token
+            }
+                
+            result = archive_helper.save_config(config_data)
+            
+            if result:
+                return {"code": 0, "msg": "保存成功"}
+            else:
+                return {"code": 1, "msg": "保存失败"}
+        except Exception as e:
+            return {"code": 1, "msg": f"保存失败：{str(e)}"}
+
+                

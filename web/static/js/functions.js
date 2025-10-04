@@ -1747,3 +1747,199 @@ function init_dropzone() {
   TorrentDropZone = new Dropzone("#torrent_files");
   TorrentDropZone.options.acceptedFiles = ".torrent";
 }
+
+// Bangumi Archive相关函数
+// 获取Bangumi Archive状态
+function load_bangumi_archive_status() {
+  ajax_post("get_bangumi_archive_status", {}, function (ret) {
+    if (ret.code === 0) {
+      $("#archive_status_size").text(ret.status.size);
+      $("#archive_status_time").text(ret.status.time);
+    }
+  });
+  
+  // 加载日志
+  load_bangumi_archive_logs();
+}
+
+// 获取Bangumi Archive更新日志
+function load_bangumi_archive_logs() {
+  ajax_post("get_bangumi_archive_logs", {}, function (ret) {
+    if (ret.code === 0) {
+      let logs = ret.logs;
+      let logContent = "";
+      
+      if (logs.length > 0) {
+        logs.forEach(function(log) {
+          // 解析日志格式: [时间] 操作 - 状态 - 信息
+          let matches = log.match(/\[(.*?)\] (.*?) - (.*?)(?: - (.*))?$/);
+          if (matches) {
+            let time = matches[1];
+            let operation = matches[2];
+            let status = matches[3];
+            let message = matches[4] || "";
+            
+            logContent += `<tr>
+              <td>${time}</td>
+              <td>${status}</td>
+              <td>${operation}${message ? ': ' + message : ''}</td>
+            </tr>`;
+          } else {
+            // 无法解析的行直接显示
+            logContent += `<tr>
+              <td colspan="3">${log}</td>
+            </tr>`;
+          }
+        });
+      } else {
+        logContent = '<tr><td colspan="3" class="text-center">暂无日志</td></tr>';
+      }
+      
+      $("#archive_log_content").html(logContent);
+    }
+  });
+}
+
+// 更新Bangumi Archive
+function update_bangumi_archive() {
+  show_wait_modal("正在更新Bangumi Archive数据，请稍候...");
+  ajax_post("update_bangumi_archive", {}, function (ret) {
+    hide_wait_modal();
+    if (ret.code === 0) {
+      // 显示进度条
+      show_update_progress_modal();
+      
+      // 开始轮询进度
+      let task_id = ret.task_id;
+      let progressInterval = setInterval(function() {
+        ajax_post("get_bangumi_archive_progress", {"task_id": task_id}, function (progress_ret) {
+          if (progress_ret.code === 0) {
+            let progress = progress_ret.progress;
+            update_progress_bar(progress);
+            
+            // 如果进度完成或失败，停止轮询
+            if (progress >= 100 || progress < 0) {
+              clearInterval(progressInterval);
+              hide_update_progress_modal();
+              
+              if (progress >= 100) {
+                show_success_modal("Bangumi Archive更新成功", function () {
+                  load_bangumi_archive_status();
+                });
+              } else {
+                show_fail_modal("Bangumi Archive更新失败");
+              }
+            }
+          } else {
+            clearInterval(progressInterval);
+            hide_update_progress_modal();
+            show_fail_modal("获取进度失败: " + progress_ret.msg);
+          }
+        });
+      }, 1000); // 每秒查询一次进度
+    } else {
+      show_fail_modal(ret.msg);
+    }
+  });
+}
+
+// 显示更新进度模态框
+function show_update_progress_modal() {
+  if ($("#update_progress_modal").length === 0) {
+    let modalHtml = `
+      <div class="modal modal-blur fade" id="update_progress_modal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">更新进度</h5>
+            </div>
+            <div class="modal-body">
+              <div class="progress">
+                <div class="progress-bar" id="update_progress_bar" style="width: 0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+              <div class="mt-2 text-center">
+                <span id="progress_text">准备更新...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    $("body").append(modalHtml);
+  }
+  $("#update_progress_modal").modal("show");
+}
+
+// 隐藏更新进度模态框
+function hide_update_progress_modal() {
+  $("#update_progress_modal").modal("hide");
+}
+
+// 更新进度条
+function update_progress_bar(progress) {
+  let progressBar = $("#update_progress_bar");
+  let progressText = $("#progress_text");
+  
+  if (progress < 0) {
+    progressBar.addClass("bg-danger");
+    progressBar.css("width", "100%");
+    progressBar.text("更新失败");
+    progressText.text("更新失败");
+  } else {
+    progressBar.removeClass("bg-danger");
+    progressBar.css("width", progress + "%");
+    
+    if (progress < 20) {
+      progressText.text("正在获取最新数据...");
+    } else if (progress < 50) {
+      progressText.text("正在下载数据文件...");
+    } else if (progress < 60) {
+      progressText.text("正在解压数据文件...");
+    } else if (progress < 90) {
+      progressText.text("正在处理数据文件...");
+    } else if (progress < 100) {
+      progressText.text("正在更新数据...");
+    } else {
+      progressText.text("更新完成");
+    }
+  }
+}
+
+// 清空Bangumi Archive数据
+function clear_bangumi_archive() {
+  show_confirm_modal("确定要清空所有Bangumi Archive数据吗？此操作不可恢复！", function () {
+    hide_confirm_modal();
+    show_wait_modal("正在清空Bangumi Archive数据，请稍候...");
+    ajax_post("clear_bangumi_archive", {}, function (ret) {
+      hide_wait_modal();
+      if (ret.code === 0) {
+        show_success_modal(ret.msg, function () {
+          load_bangumi_archive_status();
+        });
+      } else {
+        show_fail_modal(ret.msg);
+      }
+    });
+  });
+}
+
+// 保存Bangumi Archive配置
+function save_bangumi_archive_config() {
+  let config = {
+    "enabled": $("#bangumi_archive_enabled").prop("checked"),
+    "cron": $("#bangumi_archive_cron").val(),
+    "access_token": $("#bangumi_access_token").val()
+  };
+  
+  show_wait_modal("正在保存配置，请稍候...");
+  ajax_post("save_bangumi_archive_config", config, function (ret) {
+    hide_wait_modal();
+    if (ret.code === 0) {
+      show_success_modal(ret.msg, function () {
+        load_bangumi_archive_status();
+      });
+    } else {
+      show_fail_modal(ret.msg);
+    }
+  });
+}
