@@ -15,8 +15,8 @@ export class CustomFlow extends CustomElement {
   render() {
     return html`
       <div class="mb-3">
-        <div class="d-flex align-items-center pt-2">
-          <h2 class="mb-0">${this.flowTitle}</h3>
+        <div class="d-flex align-items-center mt-4 mb-4">
+          <h2 class="mb-0" style="padding-left:0.5rem">${this.flowTitle}</h3>
         </div>
         <div class="row row-cards">
           ${this.flowCard ?? nothing}

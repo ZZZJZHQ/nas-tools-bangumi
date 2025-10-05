@@ -3,6 +3,7 @@ import os
 import random
 import re
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 import zhconv
@@ -17,6 +18,7 @@ from app.media.tmdbv3api import TMDb, Search, Movie, TV, Person, Find, TMDbExcep
 from app.utils import PathUtils, EpisodeFormat, RequestUtils, NumberUtils, StringUtils, cacheman
 from app.utils.types import MediaType, MatchMode
 from app.utils.tmdb_cache import TMDBCache
+from app.helper import ThreadHelper
 from config import Config, KEYWORD_BLACKLIST, KEYWORD_SEARCH_WEIGHT_3, KEYWORD_SEARCH_WEIGHT_2, KEYWORD_SEARCH_WEIGHT_1, \
     KEYWORD_STR_SIMILARITY_THRESHOLD, KEYWORD_DIFF_SCORE_THRESHOLD
 
@@ -615,8 +617,12 @@ class Media:
         # 重置默认语言
         self.__set_language()
 
-        # 设置缓存
-        self.redis_cache.set_tmdb_info(mtype, tmdbid, tmdb_info, language)
+        # 异步设置缓存：使用统一的线程管理器
+        if tmdb_info:
+            ThreadHelper().start_thread(
+                self.redis_cache.set_tmdb_info,
+                (mtype, tmdbid, tmdb_info, language)
+            )
         
         return tmdb_info
 
@@ -841,8 +847,9 @@ class Media:
  
         # 赋值TMDB信息并返回
         meta_info.set_tmdb_info(file_media_info)
-        # 保存到缓存
-        self.redis_cache.set_media_info(title=title, info=meta_info, year=meta_info.year, mtype=mtype)
+        # 异步保存到缓存：使用统一的线程管理器
+        if cache:
+            self.redis_cache.set_media_info_async(title, meta_info, meta_info.year, mtype)
         return meta_info
 
     def get_media_info_on_files(self,
@@ -2430,8 +2437,10 @@ class Media:
         :param tmdbid: TMDBID或Bangumi ID
         """
         try:
+            log.info(f"【Meta】开始获取Bangumi角色信息，bangumi_id: {bangumi_id}")
             characters = Bangumi().characters(subject_id=bangumi_id)
             if not characters:
+                log.info(f"【Meta】Bangumi角色信息为空，bangumi_id: {bangumi_id}")
                 return []
             
             ret_chars = []
@@ -2440,7 +2449,7 @@ class Media:
                 images = character.get("images", {})
                 image_url = images.get("large") or images.get("medium") or images.get("small") or ""
                 
-                # 获取演员信息
+                # 获取角色信息
                 actors = character.get("actors", [])
                 actor_names = []
                 actor_images = []
@@ -2453,15 +2462,24 @@ class Media:
                         if actor_image:
                             actor_images.append(actor_image)
                 
+                # 安全地获取第一个演员的名字
+                actor_name = ""
+                if character.get("actors") and len(character.get("actors")) > 0:
+                    first_actor = character.get("actors")[0]
+                    if isinstance(first_actor, dict) and first_actor.get("name"):
+                        actor_name = first_actor.get("name")
+                
                 ret_chars.append({
                     "id": character.get("id"),
                     "name": character.get("name"),
-                    "role": ('CV:'+character.get("actors")[0].get("name")) or character.get("relation") or "",
+                    "role": ('CV:'+actor_name) if actor_name else character.get("relation") or "",
                     "image": image_url,
                     "actor_name": " / ".join(actor_names) if actor_names else "",
-                    "actor_image": actor_images[0] if actor_images else ""
+                    "actor_image": actor_images[0] if actor_images and len(actor_images) > 0 else ""
                 })
             
+            log.info(f"【Meta】成功获取Bangumi角色信息，bangumi_id: {bangumi_id}, 角色数量: {len(ret_chars)}")
             return ret_chars
         except Exception as err:
             log.error(f"【Meta】获取Bangumi角色信息出错：{str(err)}")
+            return []

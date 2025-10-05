@@ -39,22 +39,24 @@ export class PageMediainfo extends CustomElement {
           this.fav = ret.data.fav;
           this.item_url = ret.data.item_url
           this.seasons_data = ret.data.seasons;
-          // 类似
-          Golbal.get_cache_or_ajax("get_recommend", "sim", { "type": this.media_type, "subtype": "sim", "tmdbid": ret.data.tmdbid, "page": 1},
-            (ret) => {
-              if (ret.code === 0) {
-                this.similar_media = ret.Items;
+          if(!this._isBangumi()) {
+            // 类似
+            Golbal.get_cache_or_ajax("get_recommend", "sim", { "type": this.media_type, "subtype": "sim", "tmdbid": ret.data.tmdbid, "page": 1},
+              (ret) => {
+                if (ret.code === 0) {
+                  this.similar_media = ret.Items;
+                }
               }
-            }
-          );
-          // 推荐
-          Golbal.get_cache_or_ajax("get_recommend", "more", { "type": this.media_type, "subtype": "more", "tmdbid": ret.data.tmdbid, "page": 1},
-            (ret) => {
-              if (ret.code === 0) {
-                this.recommend_media = ret.Items;
+            );
+            // 推荐
+            Golbal.get_cache_or_ajax("get_recommend", "more", { "type": this.media_type, "subtype": "more", "tmdbid": ret.data.tmdbid, "page": 1},
+              (ret) => {
+                if (ret.code === 0) {
+                  this.recommend_media = ret.Items;
+                }
               }
-            }
-          );
+            );
+          }
         } else {
           show_fail_modal("未查询到媒体信息！");
           window.history.go(-1);
@@ -106,11 +108,11 @@ export class PageMediainfo extends CustomElement {
                     <strong class="h1" ?hidden=${!this.media_info.year}>(${this.media_info.year})</strong>
                   </h1>
                   <div class="align-self-center align-self-md-start text-center">
-                    <span class="h3 ms-1" ?hidden=${!this.media_info.runtime || this._isBangumi()}>${this.media_info.runtime}</span>
-                    <span class="h3" ?hidden=${!this.media_info.genres}>| ${this.media_info.genres}</span>
-                    <span class="h3" ?hidden=${!this.seasons_data.length || this._isBangumi()}>| 共 ${this.seasons_data.length} 季</span>
-                    <span class="h3" ?hidden=${!this.media_info.link && !this._isBangumi()}>| ${this._isBangumi() ? 'Bangumi' : 'TMDB'}: <a href="${this.media_info.link}" target="_blank">${this.media_id}</a></span>
-                    <span class="h3" ?hidden=${!this.media_info.douban_link || this._isBangumi()}>| 豆瓣: <a href="${this.media_info.douban_link}" target="_blank">${this.media_info.douban_id}</a>
+                    <span class="h3 ms-1" ?hidden=${!this.media_info.runtime || this._isBangumi()}>${this.media_info.runtime}| </span>
+                    <span class="h3" ?hidden=${!this.media_info.genres}>${this.media_info.genres}| </span>
+                    <span class="h3" ?hidden=${!this.seasons_data.length || this._isBangumi()}>共 ${this.seasons_data.length} 季| </span>
+                    <span class="h3" ?hidden=${!this.media_info.link}>${this._isBangumi() ? 'Bangumi' : 'TMDB'}: <a href="${this.media_info.link}" target="_blank">${this.media_info.bangumi_id}</a></span>
+                    <span class="h3" ?hidden=${!this.media_info.douban_link || this._isBangumi()}>豆瓣: <a href="${this.media_info.douban_link}" target="_blank">${this.media_info.douban_id}</a>
                     ${Object.keys(this.media_info).length === 0 ? this._render_placeholder("205px") : nothing }
                   </div>
                   <div class="align-self-center align-self-md-start text-center mt-1">
@@ -179,16 +181,22 @@ export class PageMediainfo extends CustomElement {
                 `) )
               : nothing }
             </div>
-            ${!this._isBangumi() ? html`
+            ${this.media_info.bangumi_id ?
+            html`
+            <bangumi-episodes
+              .bangumi_id=${this.media_info.bangumi_id}
+            ></bangumi-episodes>`:
+            html`
             <accordion-seasons
               .seasons_data=${this.seasons_data}
               .tmdbid=${this.media_id}
               .title=${this.media_info.title}
               .year=${this.media_info.year}
-            ></accordion-seasons>` : nothing}
+            ></accordion-seasons>`
+            }
           </div>
           <div class="col-lg-3">
-            ${this.media_info.fact && !this._isBangumi()
+            ${this.media_info.fact
             ? html`
               <div class="ms-2 me-2 mt-1">
                 <div class="card rounded-3" style="background: none">
@@ -211,7 +219,7 @@ export class PageMediainfo extends CustomElement {
         </div>
 
         <!-- 渲染演员阵容 -->
-        ${this.media_info.actors && this.media_info.actors.length && !this._isBangumi()
+        ${this.media_info.actors && this.media_info.actors.length
         ? html`
           <custom-slide
             slide-title="演员阵容"
@@ -220,11 +228,13 @@ export class PageMediainfo extends CustomElement {
             .slide_card=${this.media_info.actors.map((item) => ( html`
               <person-card
                 lazy=1
+                is-bangumi="${this._isBangumi()? "1" : "0"}"
                 person-id=${item.id}
                 person-image=${item.image}
                 person-name=${item.name}
                 person-role=${item.role}
                 @click=${() => {
+                  this._isBangumi() ? '' :
                   navmenu("recommend?type="+this.media_type+"&subtype=person&personid="+item.id+"&title=参演作品&subtitle="+item.name)
                 }}
               ></person-card>`))

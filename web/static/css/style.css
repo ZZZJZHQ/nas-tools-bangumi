@@ -194,10 +194,6 @@ body, .page {
     background: var(--tblr-bg-surface);
 }
 
-.card:hover {
-    box-shadow: var(--card-shadow-hover);
-}
-
 .card-link-pop {
     text-decoration: none;
     color: inherit;

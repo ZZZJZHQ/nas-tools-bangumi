@@ -1,16 +1,12 @@
-import os
 import json
 import zipfile
 import struct
 import requests
 import shutil
-import os
 from pathlib import Path
 from typing import Dict, Any, Callable
 from app.media.bangumi_archive import BangumiArchive
-from app.utils import RequestUtils
-from config import Config
-import time
+from app.helper.bangumi_archive_helper import BangumiArchiveHelper
 
 
 class BangumiArchiveUpdater:
@@ -31,13 +27,13 @@ class BangumiArchiveUpdater:
         """
         if archive_path is None:
             # 默认存储在与media.db相同的目录下
-            archive_path = os.path.join(Config().get_config_path(), "bangumi_archive")
+            archive_path = BangumiArchiveHelper()._base_path
         
         self.archive_path = Path(archive_path)
         self.temp_path = self.archive_path / "temp"
         self.cache_file_path = self.archive_path / self.CACHE_FILE
         self.cache_info_path = self.archive_path / self.CACHE_INFO_FILE
-        self.archive = BangumiArchive(archive_path)
+        self.archive = BangumiArchive()
         
         # 确保目录存在
         self.archive_path.mkdir(parents=True, exist_ok=True)
@@ -135,6 +131,9 @@ class BangumiArchiveUpdater:
                     progress = 60 + int(30 * (i + 1) / len(data_files))
                     progress_callback(progress)
             
+            # 生成subject-episode映射文件
+            self._generate_subject_episode_map()
+            
             # 替换现有文件
             if progress_callback:
                 progress_callback(90)
@@ -157,6 +156,14 @@ class BangumiArchiveUpdater:
                     if target_index_path.exists():
                         target_index_path.unlink()
                     shutil.move(str(temp_index_path), str(target_index_path))
+                
+            # 替换subject-episode映射文件
+            temp_map_path = self.temp_path / "subject_episode.map"
+            target_map_path = self.archive_path / "subject_episode.map"
+            if temp_map_path.exists():
+                if target_map_path.exists():
+                    target_map_path.unlink()
+                shutil.move(str(temp_map_path), str(target_map_path))
             
             # 清理临时目录
             self._clean_temp_dir()
@@ -321,7 +328,71 @@ class BangumiArchiveUpdater:
                 index_file.close()
             
         print(f"{file_path.name} 索引生成完成")
-    
+
+    def _generate_subject_episode_map(self):
+        """
+        生成subject-episode映射文件，用于提高根据subject_id查询剧集的性能
+        """
+        print("正在生成subject-episode映射文件...")
+        
+        try:
+            # 创建映射字典
+            subject_episode_map = {}
+            
+            # 读取episode数据文件
+            episode_file_path = self.temp_path / "episode.jsonlines"
+            if not episode_file_path.exists():
+                print("episode.jsonlines文件不存在，无法生成映射文件")
+                return False
+                
+            # 遍历所有剧集
+            with open(episode_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                        
+                    try:
+                        episode = json.loads(line)
+                        subject_id = episode.get("subject_id")
+                        episode_id = episode.get("id")
+                        
+                        # 确保subject_id和episode_id都存在
+                        if subject_id is not None and episode_id is not None:
+                            # 确保subject_id和episode_id都是整数类型
+                            subject_id = int(subject_id)
+                            episode_id = int(episode_id)
+                            
+                            if subject_id not in subject_episode_map:
+                                subject_episode_map[subject_id] = []
+                            subject_episode_map[subject_id].append(episode_id)
+                    except (json.JSONDecodeError, ValueError, TypeError) as e:
+                        print(f"解析第{line_num}行时出错: {e}")
+                        continue
+            
+            # 写入映射文件到临时目录
+            map_file_path = self.temp_path / "subject_episode.map"
+            print(f"正在写入映射文件，共 {len(subject_episode_map)} 个番剧")
+            
+            with open(map_file_path, 'wb') as map_file:
+                for subject_id, episode_ids in subject_episode_map.items():
+                    # 写入subject_id (4字节，小端序)
+                    map_file.write(struct.pack('<I', subject_id))
+                    # 写入episode数量 (2字节，小端序)
+                    map_file.write(struct.pack('<H', len(episode_ids)))
+                    # 写入episode_id列表 (每个4字节，小端序)
+                    for episode_id in episode_ids:
+                        map_file.write(struct.pack('<I', episode_id))
+            
+            print("subject-episode映射文件生成完成")
+            return True
+            
+        except Exception as e:
+            print(f"生成subject-episode映射文件失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
     def _clean_temp_dir(self):
         """
         清理临时目录

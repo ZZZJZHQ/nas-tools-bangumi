@@ -135,6 +135,7 @@ export class PageDiscovery extends CustomElement {
                 ? this._slide_card_list[item.title].map((card, index) => ( html`
                   <div class="col-6 col-sm-4 col-md-3 col-lg-2">
                     <normal-card
+                      style="display: flex;"
                       @fav_change=${(e) => {
                         Golbal.update_fav_data("get_recommend", item.subtype, (extra) => (
                           extra.Items[index].fav = e.detail.fav, extra

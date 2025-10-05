@@ -1,12 +1,10 @@
 import os
 import json
+from pathlib import Path
 from app.utils.commons import SingletonMeta
-from app.utils import RequestUtils, PathUtils
 from app.helper import DbHelper
 from config import Config
 import log
-import threading
-import time
 import datetime
 
 
@@ -20,16 +18,13 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
         self._cached_status = None  # 缓存的状态信息
         self._log_file = None  # 日志文件路径
         self._max_log_entries = 10  # 最大日志条目数
+        self._base_path = os.path.join(Config().get_config_path(), "bangumi_archive").replace('\\', '/')
     
     def get_config(self):
         """
         获取Bangumi Archive配置
         """
         config = self._config.get_config('bangumi_archive') or {}
-        # 同时也从bangumi配置中获取access_token
-        bangumi_config = self._config.get_config('bangumi') or {}
-        if 'access_token' not in config and 'access_token' in bangumi_config:
-            config['access_token'] = bangumi_config['access_token']
         
         return config
     
@@ -38,9 +33,6 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
         保存Bangumi Archive配置
         """
         try:
-            # 获取现有的bangumi配置
-            bangumi_config = self._config.get_config('bangumi') or {}
-            
             # 准备要更新的配置
             archive_config = self._config.get_config('bangumi_archive') or {}
             
@@ -50,16 +42,11 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
                     "enabled": data.get("enabled"),
                     "cron": data.get("cron")
                 })
-                
-                # 如果提供了access_token，则更新到bangumi配置中
-                if "access_token" in data and data["access_token"] is not None:
-                    bangumi_config["access_token"] = data["access_token"]
             
             # 保存配置
             config_data = self._config.get_config()
             config_data.update({
                 "bangumi_archive": archive_config,
-                "bangumi": bangumi_config
             })
             self._config.save_config(config_data)
             return True
@@ -151,10 +138,7 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
         :return: 状态信息
         """
         # 获取Archive路径
-        from config import Config as AppConfig
-        from pathlib import Path
-        archive_path = Path(os.path.join(AppConfig().get_config_path(), "bangumi_archive"))
-        cache_file_path = archive_path / "archive_cache.zip"
+        archive_path = Path(self._base_path)
         cache_info_path = archive_path / "cache_info.json"
         
         status = {
@@ -166,7 +150,7 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
             # 获取目录大小
             try:
                 size = sum(os.path.getsize(os.path.join(dirpath, filename)) 
-                          for dirpath, dirnames, filenames in os.walk(archive_path) 
+                          for dirpath, dirnames, filenames in os.walk(str(archive_path)) 
                           for filename in filenames 
                           if filename not in ["archive_cache.zip", "cache_info.json"] and not filename.endswith('.idx'))  # 排除缓存文件和索引文件
                 status["size"] = f"{size / (1024*1024):.2f} MB"
@@ -176,7 +160,7 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
             # 获取最后更新时间，从缓存信息中读取updated_at字段
             try:
                 if cache_info_path.exists():
-                    with open(cache_info_path, 'r', encoding='utf-8') as f:
+                    with open(str(cache_info_path), 'r', encoding='utf-8') as f:
                         cache_info = json.load(f)
                         updated_at = cache_info.get("updated_at")
                         if updated_at:
@@ -261,15 +245,12 @@ class BangumiArchiveHelper(metaclass=SingletonMeta):
         """
         self._write_log("清空数据", "开始")
         try:
-            from config import Config as AppConfig
-            from app.media.bangumi_archive_updater import BangumiArchiveUpdater
-            path = os.path.join(AppConfig().get_config_path(), "bangumi_archive")
-            if os.path.exists(path):
+            if os.path.exists(self._base_path):
                 # 只删除jsonlines数据文件和索引文件，保留缓存文件
-                for file in os.listdir(path):
-                    file_path = os.path.join(path, file)
+                for file in os.listdir(self._base_path):
+                    file_path = os.path.join(self._base_path, file)
                     # 删除数据文件和索引文件
-                    if file.endswith((".jsonlines", ".idx")):
+                    if file.endswith((".jsonlines", ".idx", ".map")):
                         os.remove(file_path)
             
             # 记录日志

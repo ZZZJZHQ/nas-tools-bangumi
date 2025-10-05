@@ -246,7 +246,8 @@ class WebAction:
             "update_all_config": self.__update_all_config,
             "add_tmdb_blacklist": self.__add_tmdb_blacklist,
             "delete_tmdb_blacklist": self.__delete_tmdb_blacklist,
-            "clear_tmdb_blacklist": self.__clear_tmdb_blacklist
+            "clear_tmdb_blacklist": self.__clear_tmdb_blacklist,
+            "bangumi_episodes": self.bangumi_episodes
         }
         # 远程命令响应
         self._commands = {
@@ -2404,6 +2405,12 @@ class WebAction:
             medias = WebUtils.search_media_infos(
                 keyword=Keyword, source=Source, page=CurrentPage)
             res_list = [media.to_dict() for media in medias]
+        elif Type == "BANGUMI_SEARCH":
+            # Bangumi搜索
+            Keyword = data.get("keyword")
+            # 调用Bangumi的搜索接口，支持分页
+            res_data = Bangumi().search_bangumi(keyword=Keyword, filters={"type": [2]}, page=CurrentPage)
+            res_list = res_data["items"]
         elif Type == "DOWNLOADED":
             # 近期下载
             res_list = self.get_downloaded({
@@ -5266,9 +5273,7 @@ class WebAction:
             config = archive_helper.get_config()
                 
             # 获取数据路径
-            archive_path = config.get("archive_path", "")
-            if not archive_path:
-                archive_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bangumi_archive")
+            archive_path = archive_helper._base_path
                 
             # 计算数据大小
             data_size = "0 MB"
@@ -5451,4 +5456,50 @@ class WebAction:
         except Exception as e:
             return {"code": 1, "msg": f"保存失败：{str(e)}"}
 
-                
+    def bangumi_episodes(self, data=None):
+        """
+        获取Bangumi番剧集数详情，支持分页
+        """
+        # 获取参数
+        subject_id = data.get("subject_id")
+        limit = int(data.get("limit", 100))  # 默认每页100条
+        offset = int(data.get("offset", 0))  # 默认偏移0
+        
+        if not subject_id:
+            return {"code": 1, "msg": "未指定Bangumi ID"}
+        
+        try:
+            # 调用Bangumi API获取剧集列表，支持分页
+            from app.media import Bangumi
+            episodes_info = Bangumi().get_bangumi_episodes(
+                bid=subject_id,
+                limit=limit,
+                offset=offset
+            )
+            
+            if episodes_info is None:
+                return {
+                    "code": 1,
+                    "msg": "无法查询到剧集信息"
+                }
+            
+            # 处理剧集数据
+            episodes = episodes_info.get("data", [])
+            
+            # 按照sort字段排序
+            episodes.sort(key=lambda x: x.get("sort", 0))
+            
+            return {
+                "code": 0,
+                "total": episodes_info.get("total", len(episodes)),
+                "limit": limit,
+                "offset": offset,
+                "data": episodes
+            }
+        except Exception as e:
+            ExceptionUtils.exception_traceback(e)
+            return {
+                "code": 1,
+                "msg": f"获取剧集信息出错：{str(e)}"
+            }
+

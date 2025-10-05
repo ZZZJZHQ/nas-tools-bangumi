@@ -184,7 +184,7 @@
   function update_bangumi_archive() {
     // 显示进度条
     $("#progress_card").show();
-    $("#update_progress").css("width", "0%").text("0%").attr("aria-valuenow", 0);
+    $("#update_progress").css("width", "0%").attr("aria-valuenow", 0);
     $("#progress_text").text("开始更新...");
     
     // 启动更新任务
@@ -209,7 +209,7 @@
         if (ret.code === 0) {
           let progress = ret.progress;
           if (progress >= 0 && progress <= 100) {
-            $("#update_progress").css("width", progress + "%").text(progress + "%").attr("aria-valuenow", progress);
+            $("#update_progress").css("width", progress + "%").attr("aria-valuenow", progress);
             $("#progress_text").text("更新中... (" + progress + "%)");
           }
           
