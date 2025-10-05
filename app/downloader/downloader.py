@@ -293,6 +293,9 @@ class Downloader(metaclass=SingletonMeta):
         :param proxy: 是否使用代理，指定该选项为 True/False 会覆盖 site_info 的设置
         :return: 下载器类型, 种子ID，错误信息
         """
+        if (media_info.title):
+            if not download_dir:
+                download_dir = os.path.join(media_info.title)
 
         def __download_fail(msg):
             """
@@ -1555,6 +1558,13 @@ class Downloader(metaclass=SingletonMeta):
             downloader=downloader
         )
         self.init_config()
+        return ret
+
+    def delete_download_history(self, history_id):
+        """
+        删除下载历史记录
+        """
+        ret = self.dbhelper.delete_download_history(history_id)
         return ret
 
     @staticmethod

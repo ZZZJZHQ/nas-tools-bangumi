@@ -180,7 +180,7 @@ class Bangumi(object):
                 self._session = requests.Session()
                 
             # 调用图片API获取重定向链接
-            url = f"https://api.bgm.tv/{self._urls["image"] % subject_id}"
+            url = f"https://api.bgm.tv/{self._urls.get('image') % subject_id}"
             log.info(f"【Bangumi】请求番剧图片，URL: {url}, image_type: {image_type}")
             headers = self.__get_headers()
             resp = self._session.get(url, params={"type": image_type}, timeout=10, headers=headers, allow_redirects=False)

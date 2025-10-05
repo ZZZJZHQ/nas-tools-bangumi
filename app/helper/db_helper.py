@@ -1627,6 +1627,14 @@ class DbHelper:
             DOWNLOADHISTORY.DOWNLOADER == downloader,
             DOWNLOADHISTORY.DOWNLOAD_ID == download_id
         ).order_by(DOWNLOADHISTORY.DATE.desc()).first()
+    
+    def delete_download_history(self, history_id):
+        """
+        删除下载历史记录
+        """
+        if not history_id:
+            return
+        self._db.query(DOWNLOADHISTORY).filter(DOWNLOADHISTORY.ID == int(history_id)).delete()
 
     @DbPersist(_db)
     def update_brushtask(self, brush_id, item):

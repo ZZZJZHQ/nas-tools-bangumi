@@ -197,23 +197,10 @@ class Searcher(metaclass=SingletonMeta):
                 # 微信未开自动下载时返回
                 if not self._search_auto:
                     return None, no_exists, len(media_list), None
-        # 过滤已下载的资源（防止与rss模块重复下载）
-        filtered_media_list = []
-        for media_item in media_list:
-            if media_item.tmdb_id:
-                season_episode = media_item.get_season_episode_string()
-                if self.dbhelper.is_exists_download_history_by_tmdb(media_item.tmdb_id, season_episode):
-                    log.info(f"【Searcher】{media_item.title} {season_episode} 已在下载历史中存在，跳过下载")
-                    continue
-            filtered_media_list.append(media_item)
-        
-        if not filtered_media_list:
-            log.info("【Searcher】所有搜索结果已在下载历史中存在，跳过下载")
-            return None, no_exists, len(media_list), 0
             
         # 择优下载
         download_items, left_medias = self.downloader.batch_download(in_from=in_from,
-                                                                     media_list=filtered_media_list,
+                                                                     media_list=media_list,
                                                                      need_tvs=no_exists,
                                                                      user_name=user_name)
         # 统计下载情况，下全了返回True，没下全返回False

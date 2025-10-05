@@ -165,6 +165,8 @@ class Subscribe(metaclass=SingletonMeta):
         is_bangumi = False
         if mediaid and str(mediaid).startswith("BG:"):
             is_bangumi = True
+        if not save_path:
+            save_path = name
         # 搜索媒体信息
         if not fuzzy_match:
             if is_bangumi:

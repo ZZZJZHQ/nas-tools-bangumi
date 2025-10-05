@@ -143,9 +143,33 @@
                       card-restype="${item.media_type}"
                       card-date="${item.date}"
                       card-site="${item.site}"
+                      card-history_id="${item.history_id}"
                     ></normal-card>`;
         $("#recommend_content").append(html);
       }
+      
+      // 为DOWNLOADED类型添加删除事件监听
+      if (Type === "DOWNLOADED") {
+        document.querySelectorAll("normal-card").forEach(card => {
+          card.addEventListener("delete_click", function(e) {
+            let detail = e.detail;
+            show_confirm_modal(`确定要删除 ${detail.title} 的下载记录吗？`, function() {
+              hide_confirm_modal();
+              // 调用后端接口删除记录
+              ajax_post("delete_download_history", {"id": detail.history_id}, function(ret) {
+                if (ret.code === 0) {
+                  // 删除成功，移除卡片
+                  card.parentNode.remove();
+                  show_success_modal("删除成功");
+                } else {
+                  show_fail_modal(ret.msg);
+                }
+              });
+            });
+          });
+        });
+      }
+      
       window_history();
       if (ret.Items.length > 0) {
         loading_data_max();

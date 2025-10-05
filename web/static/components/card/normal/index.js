@@ -79,6 +79,9 @@ export class NormalCard extends observeState(CustomElement) {
 
   _render_bottom() {
     if (this.show_sub == "1") {
+      // 检查是否为下载历史类型（通过site属性判断）
+      const isDownloaded = window.Type === "DOWNLOADED";
+      
       return html`
         <div class="d-flex justify-content-between">
           <a class="text-muted" title="搜索资源" @click=${(e) => { e.stopPropagation() }}
@@ -93,7 +96,23 @@ export class NormalCard extends observeState(CustomElement) {
               </svg>
             </span>
           </a>
-          <div class="ms-auto">
+          <div class="ms-auto d-flex">
+            ${isDownloaded ? html`
+              <div class="text-muted" title="删除记录" style="cursor: pointer; margin-right: 10px;" @click=${this._deleteClick}>
+                <span class="icon-pulse text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24"
+                      viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                      stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                    <line x1="4" y1="7" x2="20" y2="7"></line>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                    <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path>
+                    <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path>
+                  </svg>
+                </span>
+              </div>
+            ` : nothing}
             <div class="text-muted" title="加入/取消订阅" style="cursor: pointer" @click=${this._loveClick}>
               <span class="icon-pulse text-white">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-heart ${this.fav == "1" ? "icon-filled text-red" : ""}" width="24" height="24"
@@ -175,6 +194,22 @@ export class NormalCard extends observeState(CustomElement) {
         this.fav = "1";
         this._fav_change();
       });
+  }
+  
+  _deleteClick(e) {
+    e.stopPropagation();
+    // 触发删除事件，传递tmdb_id
+    const options = {
+      detail: {
+        tmdb_id: this.tmdb_id,
+        title: this.title,
+        date: this.date,
+        history_id: this.history_id
+      },
+      bubbles: true,
+      composed: true,
+    };
+    this.dispatchEvent(new CustomEvent("delete_click", options));
   }
   
 }

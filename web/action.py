@@ -2470,7 +2470,8 @@ class WebAction:
                 'image': item.POSTER,
                 'overview': item.TORRENT,
                 "date": item.DATE,
-                "site": item.SITE
+                "site": item.SITE,
+                "history_id": item.ID
             } for item in Items]}
         else:
             return {"code": 0, "Items": []}
@@ -5502,4 +5503,15 @@ class WebAction:
                 "code": 1,
                 "msg": f"获取剧集信息出错：{str(e)}"
             }
-
+        
+    def delete_download_history(self, data):
+            """
+            删除下载历史记录
+            """
+            history_id = data.get('id')
+            if not history_id:
+                return {"code": 1, "msg": "未指定下载历史记录ID"}
+            
+            # 删除下载历史记录
+            self.dbhelper.delete_download_history(history_id)
+            return {"code": 0, "msg": "删除成功"}
