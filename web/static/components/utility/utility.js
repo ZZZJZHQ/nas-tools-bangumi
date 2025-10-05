@@ -58,7 +58,11 @@ export class Golbal {
       show_ask_modal("是否确定订阅： " + title + "？", function () {
         hide_ask_modal();
         const mediaid = Golbal.convert_mediaid(tmdb_id);
-        if (media_type == "MOV" || media_type == "电影") {
+        // 判断是否为Bangumi ID (BG:开头)
+        if (mediaid.toString().startsWith("BG:")) {
+          // Bangumi订阅处理
+          add_rss_media(title, year, "TV", mediaid, "", "", add_func);
+        } else if (media_type == "MOV" || media_type == "电影") {
           add_rss_media(title, year, media_type, mediaid, "", "", add_func);
         } else {
           ajax_post("get_tvseason_list", {tmdbid: mediaid, title: title}, function (ret) {

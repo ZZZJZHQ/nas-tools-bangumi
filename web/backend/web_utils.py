@@ -98,20 +98,12 @@ class WebUtils:
             media_info.douban_id = doubanid
         elif str(mediaid).startswith("BG:"):
             # BANGUMI
-            bangumiid = str(mediaid)[3:]
-            info = Bangumi().detail(bid=bangumiid)
+            bangumi_id = str(mediaid)[3:]
+            info = Bangumi().detail(bid=bangumi_id)
             if not info:
                 return None
-            title = info.get("name")
-            title_cn = info.get("name_cn")
-            year = info.get("date")[:4] if info.get("date") else ""
-            media_info = Media().get_media_info(title=f"{title} {year}",
-                                                mtype=MediaType.TV,
-                                                append_to_response="all")
-            if not media_info or not media_info.tmdb_info:
-                media_info = Media().get_media_info(title=f"{title_cn} {year}",
-                                                    mtype=MediaType.TV,
-                                                    append_to_response="all")
+            media_info = MetaInfo(title=info.get("name_cn"))
+            media_info.set_bangumi_info(info)
         else:
             # TMDB
             info = Media().get_tmdb_info(tmdbid=mediaid,

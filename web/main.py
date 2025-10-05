@@ -1075,6 +1075,26 @@ def user_rss():
                            DownloadSettings=DownloadSettings)
 
 
+# Bangumi订阅页面
+@App.route('/bangumi_rss', methods=['POST', 'GET'])
+@login_required
+def bangumi_rss():
+    RssItems = Subscribe().get_subscribe_tvs()
+    RuleGroups = {str(group["id"]): group["name"]
+                  for group in Filter().get_rule_groups()}
+    DownloadSettings = {did: attr["name"] for did,
+                        attr in Downloader().get_download_setting().items()}
+    RestypeDict = ModuleConf.TORRENT_SEARCH_PARAMS.get("restype")
+    PixDict = ModuleConf.TORRENT_SEARCH_PARAMS.get("pix")
+    return render_template("rss/bangumi_rss.html",
+                           Items=RssItems,
+                           Count=len(RssItems),
+                           RuleGroups=RuleGroups,
+                           RestypeDict=RestypeDict,
+                           PixDict=PixDict,
+                           DownloadSettings=DownloadSettings)
+
+
 # Bangumi Archive设置页面
 @App.route('/bangumi_archive', methods=['POST', 'GET'])
 @login_required

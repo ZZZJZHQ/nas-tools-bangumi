@@ -148,6 +148,8 @@ class MetaBase(object):
     _subtitle_season_all_re = r"[全共]\s*([0-9一二三四五六七八九十]+)\s*季|([0-9一二三四五六七八九十]+)\s*季\s*[全共]"
     _subtitle_episode_re = r"(?<!全\s*|共\s*)[第\s]+([0-9一二三四五六七八九十百零EP\-]+)\s*[集话話期](?!\s*全|\s*共)"
     _subtitle_episode_all_re = r"([0-9一二三四五六七八九十百零]+)\s*集\s*[全共]|[共全]\s*([0-9一二三四五六七八九十百零]+)\s*[集话話期]"
+    # BANGUMI EPS
+    bangumi_eps = 0
 
     def __init__(self, title, subtitle=None, fileflag=False):
         self.category_handler = Category()
@@ -580,8 +582,31 @@ class MetaBase(object):
             if info.get('poster_path') else ""
         self.backdrop_path = Config().get_tmdbimage_url(info.get('backdrop_path')) \
             if info.get('backdrop_path') else ""
+    # 整合BANGUMI识别的信息
+    def set_bangumi_info(self, info):
+        if not info:
+            return
+        self.type = MediaType.ANIME
+        self.tmdb_id = f"BG:{info.get('id')}"
+        self.tmdb_info = info
+        if info.get('rating') and hasattr(info.get('rating'), 'score'):
+            self.vote_average = round(float(info.get('rating').get('score')), 1)
+        else:
+            self.vote_average = 0
+        self.overview = info.get('summary')
+        self.original_language = 'jp'
+        self.networks = [[]]
+        self.title = info.get('name_cn') or info.get('name')
+        self.original_title = info.get('name')
+        self.runtime = None
+        self.release_date = info.get('date')
+        self.cn_name = info.get('name_cn')
+        self.category = None
+        self.poster_path = info.get('images').get('large')
+        self.backdrop_path = ""
+        self.bangumi_eps = info.get('eps')
 
-    # 整合种了信息
+    # 整合种子信息
     def set_torrent_info(self,
                          site=None,
                          site_order=0,
@@ -829,5 +854,6 @@ class MetaBase(object):
             "download_setting": self.download_setting,
             "ignored_words": self.ignored_words,
             "replaced_words": self.replaced_words,
-            "offset_words": self.offset_words
+            "offset_words": self.offset_words,
+            "bangumi_eps": self.bangumi_eps,
         }
