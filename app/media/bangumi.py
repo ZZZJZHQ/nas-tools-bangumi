@@ -46,7 +46,7 @@ class Bangumi(object):
         获取请求头
         """
         headers = {
-            "User-Agent": "zzzjzhq/nas-tools-bangumi(https://github.com/ZZZJZHQ/nas-tools-bangumi)"
+            "User-Agent": "zzzjzhq/nas-tools-bangumi(https://github.com/zzzjzhq/nas-tools-bangumi)"
         }
         
         # 添加用户access_token认证头（如果存在，用于访问私有数据）
