@@ -8,7 +8,7 @@
 version: "3"
 services:
   nas-tools:
-    image: zzzjzhq/nas-tools:latest
+    image: zzzjzhq/nas-tools-bangumi:latest
     ports:
       - 3000:3000        # 默认的webui控制端口
     volumes:
@@ -60,7 +60,7 @@ docker run -d \
     -e PUID=0     `# 想切换为哪个用户来运行程序，该用户的uid` \
     -e PGID=0     `# 想切换为哪个用户来运行程序，该用户的gid` \
     -e UMASK=000  `# 掩码权限，默认000，可以考虑设置为022` \
-    zzzjzhq/nas-tools:latest
+    zzzjzhq/nas-tools-bangumi:latest
 
 # OCR服务（可选，用于验证码识别）
 docker run -d \
