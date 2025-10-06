@@ -560,6 +560,19 @@ class DownloadHistory(ClientResource):
         return WebAction().api_action(cmd='get_downloaded', data=self.parser.parse_args())
 
 
+@download.route('/history/delete')
+class DownloadHistoryDelete(ClientResource):
+    parser = reqparse.RequestParser()
+    parser.add_argument('id', type=str, help='下载历史记录ID', location='form', required=True)
+
+    @download.doc(parser=parser)
+    def post(self):
+        """
+        删除下载历史记录
+        """
+        return WebAction().api_action(cmd='delete_download_history', data=self.parser.parse_args())
+
+
 @download.route('/now')
 class DownloadNow(ClientResource):
     @staticmethod

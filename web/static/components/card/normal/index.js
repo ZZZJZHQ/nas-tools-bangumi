@@ -79,8 +79,8 @@ export class NormalCard extends observeState(CustomElement) {
 
   _render_bottom() {
     if (this.show_sub == "1") {
-      // 检查是否为下载历史类型（通过site属性判断）
-      const isDownloaded = window.Type === "DOWNLOADED";
+      // 修改为通过是否有history_id来判断是否显示删除按钮
+      const canDelete = this.history_id && this.history_id !== "None" && this.history_id !== "undefined";
       
       return html`
         <div class="d-flex justify-content-between">
@@ -97,7 +97,7 @@ export class NormalCard extends observeState(CustomElement) {
             </span>
           </a>
           <div class="ms-auto d-flex">
-            ${isDownloaded ? html`
+            ${canDelete ? html`
               <div class="text-muted" title="删除记录" style="cursor: pointer; margin-right: 10px;" @click=${this._deleteClick}>
                 <span class="icon-pulse text-white">
                   <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24"
