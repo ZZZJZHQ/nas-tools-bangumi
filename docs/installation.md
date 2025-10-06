@@ -7,8 +7,8 @@
 ```yaml
 version: "3"
 services:
-  nas-tools-bangumi:
-    image: zzzjzhq/nas-tools-bangumi:latest
+  nas-tools:
+    image: zzzjzhq/nas-tools:latest
     ports:
       - 3000:3000        # 默认的webui控制端口
     volumes:
@@ -21,8 +21,8 @@ services:
       - NT_PORT=3000 # web端口，默认3000
     restart: always
     network_mode: bridge
-    hostname: nas-tools-bangumi
-    container_name: nas-tools-bangumi
+    hostname: nas-tools
+    container_name: nas-tools
     depends_on:
       - ocr
       - chrome
@@ -52,15 +52,15 @@ docker-compose up -d
 ```bash
 # 主服务
 docker run -d \
-    --name nas-tools-bangumi \
-    --hostname nas-tools-bangumi \
+    --name nas-tools \
+    --hostname nas-tools \
     -p 3000:3000   `# 默认的webui控制端口` \
     -v $(pwd)/config:/config  `# 冒号左边请修改为你想在主机上保存配置文件的路径` \
     -v /你的媒体目录:/你想设置的容器内能见到的目录 `# 媒体目录，多个目录需要分别映射进来` \
     -e PUID=0     `# 想切换为哪个用户来运行程序，该用户的uid` \
     -e PGID=0     `# 想切换为哪个用户来运行程序，该用户的gid` \
     -e UMASK=000  `# 掩码权限，默认000，可以考虑设置为022` \
-    zzzjzhq/nas-tools-bangumi:latest
+    zzzjzhq/nas-tools:latest
 
 # OCR服务（可选，用于验证码识别）
 docker run -d \

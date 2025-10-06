@@ -169,7 +169,7 @@ export class LayoutSearchbar extends CustomElement {
                   重启
                 </a>
                 <div class="dropdown-divider"></div>
-                <a href="https://github.com/zzzjzhq/nas-tools-bangumi" target="_blank" class="dropdown-item">帮助中心</a>
+                <a href="https://github.com/zzzjzhq/nas-tools" target="_blank" class="dropdown-item">帮助中心</a>
               </div>
             </div>
           </div>

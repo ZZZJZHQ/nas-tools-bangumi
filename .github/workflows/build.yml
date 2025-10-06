@@ -45,7 +45,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/nas-tools-bangumi:latest
-            ${{ secrets.DOCKER_USERNAME }}/nas-tools-bangumi:${{ env.app_version }}
-            ghcr.io/${{ github.repository_owner }}/nas-tools-bangumi:latest
-            ghcr.io/${{ github.repository_owner }}/nas-tools-bangumi:${{ env.app_version }}
+            ${{ secrets.DOCKER_USERNAME }}/nas-tools:latest
+            ${{ secrets.DOCKER_USERNAME }}/nas-tools:${{ env.app_version }}
+            ghcr.io/${{ github.repository_owner }}/nas-tools:latest
+            ghcr.io/${{ github.repository_owner }}/nas-tools:${{ env.app_version }}
