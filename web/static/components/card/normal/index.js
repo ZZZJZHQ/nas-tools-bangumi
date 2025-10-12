@@ -21,6 +21,7 @@ export class NormalCard extends observeState(CustomElement) {
     year: { attribute: "card-year" },
     site: { attribute: "card-site" },
     weekday: { attribute: "card-weekday" },
+    history_id: { attribute: "card-historyid" },
     lazy: {},
     _placeholder: { state: true },
     _card_id: { state: true },
